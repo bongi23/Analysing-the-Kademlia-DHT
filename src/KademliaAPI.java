@@ -3,5 +3,5 @@ import java.rmi.RemoteException;
 
 public interface KademliaAPI extends Remote {
 
-    public void find_node() throws RemoteException;
+    public void find_node(byte[] id) throws RemoteException;
 }

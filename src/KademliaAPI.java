@@ -1,7 +1,7 @@
-import java.rmi.Remote;
-import java.rmi.RemoteException;
+import java.util.HashSet;
+import java.util.List;
 
-public interface KademliaAPI extends Remote {
+public interface KademliaAPI {
 
-    public void find_node(byte[] id) throws RemoteException;
+    public HashSet<NodeID> find_node(NodeID sender, NodeID request);
 }

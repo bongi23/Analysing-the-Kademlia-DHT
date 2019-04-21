@@ -1,4 +1,3 @@
-import java.io.ObjectInputStream.GetField;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,38 +32,46 @@ public class Coordinator {
 			System.err.println("Errore argomenti");
 			return;
 		}
-		Coordinator c = new Coordinator(Integer.parseInt(args[0]), Integer.parseInt(args[1]),
+		
+		new Coordinator(Integer.parseInt(args[0]), Integer.parseInt(args[1]),
 				Integer.parseInt(args[2]), Integer.parseInt(args[3]));
 		// Creating first node of the network
+		
 		Node first = new Node(bits, tables, buckets);
 		nodes.add(first);
 		nodesRepo.put(first.getId(), first);
 		
 		for(int i=0; i<netDim-1; i++) {
-			Node n = new Node(bits, tables, buckets);
-			nodes.add(n);
-			nodesRepo.put(n.getId(), n);
+			System.out.println("Inserting node "+i);
 			
 			Node bootstrap = randomNode();
-			Random r = new Random();
+			Node joining = new Node(bits, tables, buckets); // node joining the net
 			
+			while(nodesRepo.get(joining.getId()) != null)
+				joining = new Node(bits, tables, buckets);
+			
+			nodes.add(joining);
+			nodesRepo.put(joining.getId(), joining);
+			
+			joining.insertRT(bootstrap.getId());
+						
 			for(int j=0; j<tables; j++) {
-				int idNum = r.nextInt(buckets)+1;
+				System.out.println("Bucket "+j);
+				if(nodes.size()-1 == joining.neigs) break;
 				
-				for(int k = 0; k<idNum; k++) {
-					NodeID id = NodeID.randomId(n.getId().getId(), (int) Math.pow(2, i));
-					n.recursiveNodeSearch(id, bootstrap.find_node(n.getId(), id));
+				
+				for(int k = 0; k<buckets; k++) {
+					System.out.println("Searching "+k);
+					if(nodes.size()-1 == joining.neigs) break;
+					NodeID searching = NodeID.randomId(joining.getId().getId(), (int) Math.pow(2, j));
+					if(searching.equals(bootstrap.getId())) continue;
+					joining.recursiveNodeSearch(searching, bootstrap.find_node(joining.getId(), searching));
 				}
 				
 			}
 			
-			
 		}
-		// Per n-1 volte
-			// genera un nodo p casualmente
-			// scegli casualmente un bootstrap node b
-			// genera un certo numero di ID associati ai range di distanza dei bucket della routing table di p
-				// per ogni ID chiama la funzione b.find_node()
-				// aggiorna la routing table di p
+		for(Node n: nodes)
+			n.printRT();
 	}
 }

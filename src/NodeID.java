@@ -82,9 +82,9 @@ public class NodeID implements Comparable<NodeID>, Serializable{
 		
 		MessageDigest digest = MessageDigest.getInstance("SHA-256");
 		byte[] encodedhash = digest.digest(tmp);
+		
 		BitSet bs = BitSet.valueOf(encodedhash);
 		bs.clear(size, bs.size());
-		bs.set(size-1, generator.nextBoolean());
 		
 		return bs;
 	}

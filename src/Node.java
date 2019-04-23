@@ -4,17 +4,17 @@ import java.util.HashSet;
 import java.util.Iterator;
 
 public class Node implements KademliaAPI{
-	public HashMap<Integer, ArrayList<NodeID>> routingTable;
-	private NodeID id;
-	private int buckets;
-	private int maxRTsize;
-	public int neigs;
+	public HashMap<Integer, ArrayList<KadMessage>> routingTable;
+	private NodeID id;	   /* identifier of the node */
+	private int buckets;   /* size of the k-buckets  */
+	private int maxRTsize; /* maximal size of the routing table, used when it is necessary to visit it all */
+	public int neigs;	   /* number of neighbours */
 	
-	//idSize in bits
+	
 	 public Node(int idSize, int tabSize, int k) {
 		 this.id = new NodeID(idSize);
 		 this.buckets = k;
-		 this.routingTable = new HashMap<Integer, ArrayList<NodeID>>();
+		 this.routingTable = new HashMap<Integer, ArrayList<KadMessage>>();
 		 this.maxRTsize = tabSize;
 		 this.neigs = 0;
 	 }
@@ -24,51 +24,68 @@ public class Node implements KademliaAPI{
 	 }
 	 
 	 // looking for id, asking to node in "visit"
-	 public void recursiveNodeSearch(NodeID searching, HashSet<NodeID> tocontact) {
+	 public void recursiveNodeSearch(NodeID searching, HashSet<KadMessage> tocontact) {
 		 if(tocontact.isEmpty()) return;
-		 Iterator<NodeID> it = tocontact.iterator();
-		 HashSet<NodeID> acc = new HashSet<NodeID>();
+		 Iterator<KadMessage> it = tocontact.iterator();
+		 HashSet<KadMessage> acc = new HashSet<KadMessage>();
 		 while(it.hasNext()) {
-			 NodeID n = it.next();
+			 KadMessage msg = it.next();
 			 
-			 if(NodeID.xorDistance(this.id.getId(), n.getId()) == 0) continue;
+			 if(NodeID.xorDistance(this.id.getId(), msg.getReply().getId()) == 0) continue;
 			 
-			 if(!this.insertRT(n) || searching.equals(n)) continue;
+			 if(searching.equals(msg.getReply())) {
+				 this.insertRT(msg);
+				 return;
+			 }
+			 if(!this.insertRT(msg)) continue;
 			 
-			 Node node = Coordinator.nodesRepo.get(n);
+			 Node node = Coordinator.nodesRepo.get(msg.getReply());
 			 acc.addAll(node.find_node(this.getId(), searching));
+			 for(NodeID id : msg.getTraversed()) {
+				 Node tmp = Coordinator.nodesRepo.get(id);
+				 acc.addAll(tmp.find_node(this.getId(), searching));
+			 }
 		 }
 		 acc.removeAll(tocontact);
 		 recursiveNodeSearch(searching, acc);
 	 }
 	 
 	@Override
-	public HashSet<NodeID> find_node(NodeID sender, NodeID request) {
-		ArrayList<NodeID> neig = this.getNeighbours(request); // invertire
-		this.insertRT(sender);
-		if(neig == null) return new HashSet<NodeID>();
-		return new HashSet<NodeID>(neig);
+	public HashSet<KadMessage> find_node(NodeID sender, NodeID request) {
+		if(request.equals(this.id)) {
+			HashSet<KadMessage> res = new HashSet<KadMessage>();
+			res.add(new KadMessage(this.id));
+			return res;
+		}
+		ArrayList<KadMessage> neig = this.getNeighbours(request);
+		
+		/* if there is space, add the sender of the request to my RT*/
+		this.insertRT(new KadMessage(sender));
+		
+		if(neig == null) return new HashSet<KadMessage>();
+		return new HashSet<KadMessage>(neig);
 	}
 
-	private ArrayList<NodeID> getNeighbours(NodeID request) {
+	private ArrayList<KadMessage> getNeighbours(NodeID request) {
 		int dist = NodeID.xorDistance(request.getId(),this.id.getId());
 		int bucket = (int) (Math.log(dist)/Math.log(2));
 		
-		ArrayList<NodeID> neigs = routingTable.get(bucket);
-		ArrayList<NodeID> res = new ArrayList<NodeID>(this.buckets);
+		ArrayList<KadMessage> neigs = routingTable.get(bucket);
+		/*result will be accumulated in res*/
+		ArrayList<KadMessage> res = new ArrayList<KadMessage>(this.buckets);
 		
 		int first = bucket;
 		
 		if(neigs != null) {
-			for(NodeID id : neigs)
-				res.add(id);
+			for(KadMessage msg : neigs)
+				res.add(msg);
 			while(res.size() != this.buckets) {
-				bucket = (bucket+1) %this.maxRTsize;
+				bucket = (bucket+1) % this.maxRTsize;
 				if (first==bucket) break;
-				ArrayList<NodeID> next = routingTable.get(bucket);
+				ArrayList<KadMessage> next = routingTable.get(bucket);
 				if(next != null) {
-					for(NodeID id : next) {
-						res.add(id);
+					for(KadMessage msg : next) {
+						res.add(msg);
 					}
 				}
 			}
@@ -77,10 +94,10 @@ public class Node implements KademliaAPI{
 			while(res.size() != this.buckets) {
 				bucket = (bucket+1) %this.maxRTsize;
 				if (first==bucket) break;
-				ArrayList<NodeID> next = routingTable.get(bucket);
+				ArrayList<KadMessage> next = routingTable.get(bucket);
 				if(next != null) {
-					for(NodeID id : next) {
-						res.add(id);
+					for(KadMessage msg : next) {
+						res.add(msg);
 					}
 				}
 			}
@@ -88,21 +105,26 @@ public class Node implements KademliaAPI{
 		return res;
 	}
 
-	public boolean insertRT(NodeID id) {
+	public boolean insertRT(KadMessage msg) {
 		// retrieving k-bucket
-		int key = (int) (Math.log(NodeID.xorDistance(id.getId(),this.id.getId()))/Math.log(2));
-		ArrayList<NodeID> nodes = this.routingTable.get(key);
-		
+		int key = (int) (Math.log(NodeID.xorDistance(msg.getReply().getId(),this.id.getId()))/Math.log(2));
+		ArrayList<KadMessage> nodes = this.routingTable.get(key);
+				
 		if(nodes == null) {
-			nodes = new ArrayList<NodeID>(this.buckets);
-			nodes.add(id);
-						
+			nodes = new ArrayList<KadMessage>(this.buckets);
+			
+			nodes.add(msg);
+			msg.addTraversed(this.id);			
+			
 			this.routingTable.put(key, nodes);
 			this.neigs++;
+			
 			return true;
 		}
-		else if(nodes.size() < this.buckets && !nodes.contains(id)) {
-			nodes.add(id);
+		else if(nodes.size() < this.buckets && !nodes.contains(msg)) {
+			nodes.add(msg);
+			msg.addTraversed(this.id);
+
 			this.neigs++;
 			return true;
 		}
@@ -113,11 +135,12 @@ public class Node implements KademliaAPI{
 		System.out.println("RT of "+this.id.getId());
 		for(int i=0; i<this.routingTable.size(); i++) {
 			System.out.print(i+": ");
-			ArrayList<NodeID> n = this.routingTable.get(i);
+			ArrayList<KadMessage> n = this.routingTable.get(i);
 			if(n != null) {
-				for(NodeID id : n) {
-					System.out.print(id.getId()+" -> ");
+				for(KadMessage msg : n) {
+					System.out.print(msg.getReply().getId()+" -> ");
 				}
+				System.out.print("/");
 			}
 			System.out.println();
 		}

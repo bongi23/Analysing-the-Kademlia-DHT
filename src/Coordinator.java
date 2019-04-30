@@ -89,6 +89,6 @@ public class Coordinator {
 			}
 			
 		}
-		network2csv("./"+numberOfNodes+"_"+(idSize)+"_"+bucketsSize+"improved.csv");
+		network2csv("./"+numberOfNodes+"_"+(idSize)+"_"+bucketsSize+".csv");
 	}
 }

@@ -9,4 +9,4 @@ Compile with `javac Coordinaor.java`
 
 Execute with `java Coordinator size_of_network size_of_ids size_of_buckets`
 
-Networks are saved in a file called `n_m_k.csv`: n, m and k are the three input parameter of main method.
+Networks are saved in a file called `n_m_k.csv`: n, m and k are the three input parameters of main method.

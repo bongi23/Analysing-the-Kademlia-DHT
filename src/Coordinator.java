@@ -48,7 +48,7 @@ public class Coordinator {
 	
 	public static void main(String[] args) throws IOException {
 		if(args.length != 3) {
-			System.err.println("Error! Provide 4 arguments: #nodes, #bits_of_id, #k_buckets, dim_of_buckets");
+			System.err.println("Error! Provide 3 arguments: #nodes, #bits_of_id, dim_of_buckets");
 			return;
 		}
 		int numberOfNodes = Integer.parseInt(args[0]);

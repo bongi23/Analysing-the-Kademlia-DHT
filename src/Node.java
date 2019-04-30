@@ -3,19 +3,19 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 
-public class Node implements KademliaAPI{
-	public HashMap<Integer, ArrayList<KadMessage>> routingTable;
+public class Node {
+	
+	private HashMap<Integer, ArrayList<KadMessage>> routingTable;
 	private NodeID id;	   /* identifier of the node */
 	private int buckets;   /* size of the k-buckets  */
-	private int maxRTsize; /* maximal size of the routing table, used when it is necessary to visit it all */
+	
 	public int neigs;	   /* number of neighbours */
 	
 	
-	 public Node(int idSize, int tabSize, int k) {
+	 public Node(int idSize, int k) {
 		 this.id = new NodeID(idSize);
 		 this.buckets = k;
 		 this.routingTable = new HashMap<Integer, ArrayList<KadMessage>>();
-		 this.maxRTsize = tabSize;
 		 this.neigs = 0;
 	 }
 	 
@@ -23,34 +23,67 @@ public class Node implements KademliaAPI{
 		 return this.id;
 	 }
 	 
-	 // looking for id, asking to node in "visit"
-	 public void recursiveNodeSearch(NodeID searching, HashSet<KadMessage> tocontact) {
-		 if(tocontact.isEmpty()) return;
-		 Iterator<KadMessage> it = tocontact.iterator();
+	 /*
+	  * Returns the bucket in which request should be stored
+	  * */
+	 private int getBucket(NodeID request) {
+		double dist = NodeID.xorDistance(request.getId(),this.id.getId());
+		int bucket = (int) (Math.log(dist)/Math.log(2));
+		
+		return bucket;
+	
+	 }
+	 /*
+	  * Recursive function that for every message in toContact first check if it contains
+	  * the searching node, if not the id contained in the message is contacted and the
+	  * same for each id in toContact.traversed
+	  * 
+	  * This method ends when there aren't id to contact or when searching is found
+	  * 
+	  * contacted is used in order to avoid re-contacting the same node obtained by different messages
+	  * */
+	 public void recursiveNodeSearch(NodeID searching, HashSet<KadMessage> toContact, HashSet<KadMessage> contacted) {
+		 if(toContact.isEmpty()) return;
+		 
+		 Iterator<KadMessage> it = toContact.iterator();
 		 HashSet<KadMessage> acc = new HashSet<KadMessage>();
+		 
 		 while(it.hasNext()) {
 			 KadMessage msg = it.next();
 			 
-			 if(NodeID.xorDistance(this.id.getId(), msg.getReply().getId()) == 0) continue;
+			 if(this.id.equals(msg.getReply())) continue;
 			 
+			 // found!!
 			 if(searching.equals(msg.getReply())) {
 				 this.insertRT(msg);
 				 return;
 			 }
+			 
 			 if(!this.insertRT(msg)) continue;
 			 
+			 // obtaining node object from coordinator
 			 Node node = Coordinator.nodesRepo.get(msg.getReply());
 			 acc.addAll(node.find_node(this.getId(), searching));
+			 
+			 contacted.add(msg);
+			 
+			 // contacting every node traversed by the message
 			 for(NodeID id : msg.getTraversed()) {
+				 if(this.id.equals(id)) continue;
+				 
 				 Node tmp = Coordinator.nodesRepo.get(id);
 				 acc.addAll(tmp.find_node(this.getId(), searching));
+				 contacted.add(msg);
 			 }
 		 }
-		 acc.removeAll(tocontact);
-		 recursiveNodeSearch(searching, acc);
+		 
+		 acc.removeAll(contacted);
+		 recursiveNodeSearch(searching, acc, contacted);
 	 }
-	 
-	@Override
+	
+	/*
+	 * "Exposed" API by every node. Returns the list of closer neighbours to request 
+	 */
 	public HashSet<KadMessage> find_node(NodeID sender, NodeID request) {
 		if(request.equals(this.id)) {
 			HashSet<KadMessage> res = new HashSet<KadMessage>();
@@ -65,12 +98,16 @@ public class Node implements KademliaAPI{
 		if(neig == null) return new HashSet<KadMessage>();
 		return new HashSet<KadMessage>(neig);
 	}
-
+	
+	/*
+	 * Logic of "find_node" function, returns when possible this.buckets neighbours 
+	 * It may traverse every bucket of the routing table
+	 * */
 	private ArrayList<KadMessage> getNeighbours(NodeID request) {
-		int dist = NodeID.xorDistance(request.getId(),this.id.getId());
-		int bucket = (int) (Math.log(dist)/Math.log(2));
+		int bucket = this.getBucket(request);
 		
 		ArrayList<KadMessage> neigs = routingTable.get(bucket);
+		
 		/*result will be accumulated in res*/
 		ArrayList<KadMessage> res = new ArrayList<KadMessage>(this.buckets);
 		
@@ -79,72 +116,46 @@ public class Node implements KademliaAPI{
 		if(neigs != null) {
 			for(KadMessage msg : neigs)
 				res.add(msg);
-			while(res.size() != this.buckets) {
-				bucket = (bucket+1) % this.maxRTsize;
-				if (first==bucket) break;
-				ArrayList<KadMessage> next = routingTable.get(bucket);
-				if(next != null) {
-					for(KadMessage msg : next) {
-						res.add(msg);
-					}
-				}
-			}
 		}
-		else { 
-			while(res.size() != this.buckets) {
-				bucket = (bucket+1) %this.maxRTsize;
-				if (first==bucket) break;
-				ArrayList<KadMessage> next = routingTable.get(bucket);
-				if(next != null) {
-					for(KadMessage msg : next) {
-						res.add(msg);
-					}
-				}
-			}
+		while(res.size() != this.buckets) {
+			bucket = (bucket+1) % this.id.getSize();
+			
+			if (first==bucket) break;
+			
+			ArrayList<KadMessage> next = routingTable.get(bucket);
+			if(next != null)
+				for(KadMessage msg : next) 
+					res.add(msg);
 		}
 		return res;
 	}
 
+	/*
+	 * Store a message into the routing table, if there is
+	 * enough space in the right bucket
+	 * */
 	public boolean insertRT(KadMessage msg) {
 		// retrieving k-bucket
-		int key = (int) (Math.log(NodeID.xorDistance(msg.getReply().getId(),this.id.getId()))/Math.log(2));
+		int key = this.getBucket(msg.getReply());
 		ArrayList<KadMessage> nodes = this.routingTable.get(key);
 				
-		if(nodes == null) {
+		if(nodes == null)
 			nodes = new ArrayList<KadMessage>(this.buckets);
-			
-			nodes.add(msg);
-			msg.addTraversed(this.id);			
-			
-			this.routingTable.put(key, nodes);
-			this.neigs++;
-			
-			return true;
-		}
-		else if(nodes.size() < this.buckets && !nodes.contains(msg)) {
+	
+		if(nodes.size() < this.buckets && !nodes.contains(msg)) {
 			nodes.add(msg);
 			msg.addTraversed(this.id);
-
+			this.routingTable.put(key, nodes);
+			
 			this.neigs++;
 			return true;
 		}
+		
 		return false;
 	}
-	
-	public void printRT() {
-		System.out.println("RT of "+this.id.getId());
-		for(int i=0; i<this.routingTable.size(); i++) {
-			System.out.print(i+": ");
-			ArrayList<KadMessage> n = this.routingTable.get(i);
-			if(n != null) {
-				for(KadMessage msg : n) {
-					System.out.print(msg.getReply().getId()+" -> ");
-				}
-				System.out.print("/");
-			}
-			System.out.println();
-		}
-		System.out.println("------------------");
+
+	public HashMap<Integer, ArrayList<KadMessage>> getRoutingTable() {
+		return this.routingTable;
 	}
 	
 }

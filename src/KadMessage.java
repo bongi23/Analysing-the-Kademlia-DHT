@@ -1,14 +1,13 @@
 import java.util.HashSet;
 
 public class KadMessage implements Comparable<KadMessage> {
-	NodeID reply;
-	HashSet<NodeID> traversed;
+	private NodeID reply; 
+	private HashSet<NodeID> traversed; /* list of nodes traversed by this message*/
 	
 	public KadMessage(NodeID reply) {
 		this.reply = reply;
 		this.traversed = null;
 	}
-
 
 	public void addTraversed(NodeID id) {
 		if(this.traversed == null)
@@ -17,7 +16,6 @@ public class KadMessage implements Comparable<KadMessage> {
 		
 	}
 
-	
 	public NodeID getReply() {
 		return this.reply;
 	}
@@ -37,7 +35,6 @@ public class KadMessage implements Comparable<KadMessage> {
 	public int hashCode() {
 		return this.reply.hashCode();
 	}
-
 
 	@Override
 	public int compareTo(KadMessage o) {

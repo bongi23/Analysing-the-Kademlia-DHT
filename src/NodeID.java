@@ -33,15 +33,16 @@ public class NodeID implements Comparable<NodeID>, Serializable{
 		return this.id;
 	}
 	
-	//We can assume distance between 2 ids fits in 32 bits
-	public static int xorDistance(BitSet id1, BitSet id2) {
+	/*
+	 * Compute xor between two bit set and interprets it as an unsigned double
+	 * */
+	public static double xorDistance(BitSet id1, BitSet id2) {
 		BitSet res = new BitSet();
 		res.or(id1);
 		res.xor(id2);
 		
 		BigInteger d = new BigInteger(1, reverse(res.toByteArray()));
-		
-		return d.intValue(); 
+		return d.doubleValue(); 
 	}
 	
 	private static byte[] reverse(byte[] bs) {
@@ -55,8 +56,10 @@ public class NodeID implements Comparable<NodeID>, Serializable{
 		return res;
 	}
 
-	// assumption: min is a power of two
-	// id is generated at a distance between min and the next power of two-1
+	/*
+	 * Generate a random identifier whose xor distance from id is
+	 * between minDistance and (2*minDistance)-1.
+	 * */
 	public static NodeID randomId(BitSet id, long minDistance) {
 		int iMin = (int) (Math.log(minDistance)/Math.log(2));
 	    
@@ -73,8 +76,10 @@ public class NodeID implements Comparable<NodeID>, Serializable{
 	    return new NodeID(bsNewId);
 	}
 	
+	/*Generates a random identifier of size bit */
 	public static BitSet randomId(int size) throws NoSuchAlgorithmException {
-		int d = size/8 > 0 ? size/8 : 1;
+		float dSize = size;
+		int d = (int) Math.ceil(dSize/8.0 > 0 ? dSize/8.0 : 1);
 		byte[] tmp = new byte[d];
 		
 		Random generator = new Random();
@@ -105,5 +110,17 @@ public class NodeID implements Comparable<NodeID>, Serializable{
 		BigInteger a = new BigInteger(1, this.id.toByteArray());
 		BigInteger b = new BigInteger(1, id.id.toByteArray());
 		return a.compareTo(b);
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		for(int i = 0; i<this.getSize(); i++) {
+			if(this.id.get(i))
+				sb.append("1");
+			else
+				sb.append("0");
+		}
+		return sb.reverse().toString();
 	}
 }

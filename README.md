@@ -1,5 +1,8 @@
 # Analysing-the-Kademlia-DHT
-Homework for the P2P and Blockchain course of the University of Pisa' Master Degree in Computer Science
+First mid term for the *P2P and Blockchain* course of the University of Pisa, M. Sc. in Computer Science, ICT Solutions Architect curriculum.
+
+# Brief description
+This homework aims at analysing the behaviour of a Kademlia network, from a *graph analysis point-of-view*, when changing the various parameter of the protocol. The requirements of this assignment can be found into *Assignment.pdf* while into *Analysing_the_Kademlia_DHT_report.pdf* there is a deep description of the code, the main projectual choices and the graph analysis of the obtained networks. 
 
 # Usage
 
